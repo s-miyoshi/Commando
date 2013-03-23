@@ -3,6 +3,7 @@
 #include <ctime>
 #include <cstring>
 #include <fstream>
+#include <list>
 
 #define MAIN
 #define DEBUG
@@ -14,6 +15,7 @@
 #include "Enemy.h"
 #include "Enemy1.h"
 #include "Enemy2.h"
+#include "Enemy3.h"
 #include "EnemyBeam.h"
 
 const int CHARACTER_WIDTH=2, CHARACTER_HEIGHT=1;
@@ -25,150 +27,118 @@ std::ofstream fout;
 
 void start(MyShip** myship, int& score){
 	//ゲーム開始前にやる初期化
-	const int xs=30, ys=22;
+	const int xs=(FIELD_WIDTH-CHARACTER_WIDTH)/2, ys=22;
 	*myship=new MyShip(xs, ys, CHARACTER_WIDTH, CHARACTER_HEIGHT, 3, true);
 	score=0;
 }
 
-void end(MyShip** myship, MyShipBeam** myshipBeam, Enemy** enemy, EnemyBeam** enemyBeam){
+void end(MyShip** myship, std::list<MyShipBeam*>& myshipBeam, std::list<Enemy*>& enemy, std::list<EnemyBeam*>& enemyBeam){
 	//ゲーム終了時にやる後始末
 	delete *myship;
 	myship=NULL;
-	for(int i=0;i<MAX_BEAM;++i){
-		delete *(myshipBeam+i);
-		*(myshipBeam+i)=NULL;
-	}
-	for(int i=0;i<MAX_ENEMY;++i){
-		delete *(enemy+i);
-		*(enemy+i)=NULL;
-	}
-	for(int i=0;i<MAX_ENEBEAM;++i){
-		delete *(enemyBeam+i);
-		*(enemyBeam+i)=NULL;
-	}
+	
+	for(std::list<MyShipBeam*>::iterator i=myshipBeam.begin();i!=myshipBeam.end();++i) delete *i;
+	myshipBeam.clear();
+	for(std::list<Enemy*>::iterator i=enemy.begin();i!=enemy.end();++i) delete *i;
+	enemy.clear();
+	for(std::list<EnemyBeam*>::iterator i=enemyBeam.begin();i!=enemyBeam.end();++i) delete *i;
+	enemyBeam.clear();
 }
 
-void makeMyShipBeam(const MyShip* myship, MyShipBeam** myshipBeam){
-	for(int i=0;i<MAX_BEAM;++i){
-		if(*(myshipBeam+i)==NULL){
-			*(myshipBeam+i)=new MyShipBeam(myship->x, myship->y-1, CHARACTER_WIDTH, CHARACTER_HEIGHT);
+void makeMyShipBeam(const MyShip* myship, std::list<MyShipBeam*>& myshipBeam){
+	myshipBeam.push_back(new MyShipBeam(myship->x, myship->y-1, CHARACTER_WIDTH, CHARACTER_HEIGHT));
+}
+
+
+int makeEnemy(std::list<Enemy*>& enemy){
+	int pattern=0;
+	switch(pattern){
+	
+	//左右一杯往復 只
+	case 0:
+		{
+			int n=rand()%9+8;
+			const int MAX_Y=18;
+			bool* used=new bool[MAX_Y];
+
+			for(int i=0;i<MAX_Y;++i) *(used+i)=false;
+
+			for(int i=0;i<n;++i){
+				int x=rand()%FIELD_WIDTH-CHARACTER_WIDTH;
+				int y=rand()%MAX_Y;
+				for(;used[y];y=rand()%MAX_Y) fout<<' '<<y;
+				used[y]=true;
+				enemy.push_back(new Enemy2(x, y, CHARACTER_WIDTH, CHARACTER_HEIGHT, 1));
+			}
+			delete used;
+			return n;
 			break;
 		}
-	}
-}
 
-bool add(Enemy** array, Enemy* e, int max){
-	for(int i=0;i<max;++i){
-		if(*(array+i)==NULL){
-			*(array+i)=e;
-			return true;
-		}
-	}
-	return false;
-}
-
-int makeEnemy(Enemy** enemy){
-	const int MIN_ENEMY=3;
-	int n=rand()%(10-MIN_ENEMY+1)+MIN_ENEMY;
-	
-	int pattern=rand()%2;
-
-	for(int k=0;k<n;++k){
-		for(int i=0;i<MAX_ENEMY;++i){
-			if(*(enemy+i)==NULL){
-				int x, y, r;
-				bool ccw;
-
-				switch(pattern){
-				//菱形回転 "龠" をランダム配置
-				case 0:
-					r=rand()%2+2;
-					ccw=(rand()%2==1);
-					
+	//四近傍円(菱形) 龠
+	case 1:
+		{
+			int total=0;
+			int n=rand()%3+3;
+			int used[n][3];
+			for(int i=0;i<n;++i) for(int j=0;j<3;++j) used[i][j]=(j==2?0:10000);
+			
+			for(int i=0;i<n;++i){
+				int r, x, y;
+				bool improper=false;
+/*				do{
+					r=rand()%3+2;
 					x=(rand()%(FIELD_WIDTH/2-2*r)+r)*2;
 					y=rand()%(16-2*r)+r;
-					
-					*(enemy+i)=new Enemy1(x, y, CHARACTER_WIDTH, CHARACTER_HEIGHT, 1, r, 0, ccw);
-					break;
-				//往復移動 "只" をランダム配置
-				case 1:
-					x=rand()%FIELD_WIDTH,y=rand()%15;
-					*(enemy+i)=new Enemy2(x, y, CHARACTER_WIDTH, CHARACTER_HEIGHT, 1);
-					break;
-				}
-				break;
-			}
-			
-		}
-	}
-	return n;
-}
+					fout<<x<<" "<<y<<" "<<r<<std::endl;
+					for(int j=0;j<i;++j){
+						if(abs(x-used[j][0])+abs(y-used[j][1])<=r+used[j][2]) improper=true;
+					}
+				}while(improper);
+				used[i][0]=x; used[i][1]=y;
+*/				bool ccw=(rand()%2==1);
+				int k=4;
 
-void makeEnemyBeam(const Enemy* enemy, EnemyBeam** enemyBeam){
-	for(int i=0;i<MAX_ENEBEAM;++i){
-		if(*(enemyBeam+i)==NULL){
-			*(enemyBeam+i)=new EnemyBeam(enemy->x, enemy->y+1, CHARACTER_WIDTH, CHARACTER_HEIGHT, 2, 0);
+				for(int j=0;j<k;++j){
+					int s=( j==1 ? 2 : ( j==2 ? 1 : j ));
+					enemy.push_back(new Enemy1(x, y, CHARACTER_WIDTH, CHARACTER_HEIGHT, 1, r, s, ccw));
+				}
+				total+=k;
+			}
+			return total;
 			break;
 		}
 	}
+}
+
+void makeEnemyBeam(const Enemy* enemy, std::list<EnemyBeam*>& enemyBeam){
+	enemyBeam.push_back(new EnemyBeam(enemy->x, enemy->y+1, CHARACTER_WIDTH, CHARACTER_HEIGHT, 2, 0));
 }
 
 bool checkHit(int x1, int y1, int w1, int h1, int x2, int y2, int h2, int w2){
 	return x1<=x2+w2-1&&x1+w1-1>=x2&&y1<=y2+h2-1&&y1+h1-1>=y2;
 }
 
-int checkHitEnemy(MyShipBeam** mybeam, Enemy* enemy){
-	int s=0;
-	for(int i=0;i<MAX_BEAM;++i){
-		if(*(mybeam+i)==NULL) continue;
-		if(checkHit(enemy->x, enemy->y, enemy->width, enemy->height, (*(mybeam+i))->x, (*(mybeam+i))->y, (*(mybeam+i))->width, (*(mybeam+i))->height)){
-			delete *(mybeam+i);
-			*(mybeam+i)=NULL;
-			if(--(enemy->HP)<=0)++s;
-		}
-	}
-	return s;
-}
-
-bool checkHitMyShip_EnemyBeam(MyShip* myship, EnemyBeam** enemyBeam){
-	for(int i=0;i<MAX_ENEBEAM;++i){
-		if(*(enemyBeam+i)==NULL) continue;
-		if(checkHit(myship->x, myship->y, myship->width, myship->height, (*(enemyBeam+i))->x, (*(enemyBeam+i))->y, (*(enemyBeam+i))->width, (*(enemyBeam+i))->height)){
-			delete *(enemyBeam+i);
-			*(enemyBeam+i)=NULL;
-			myship->state=DAMAGE;
+template<typename T1, typename T2> bool checkHit_Chars(T1 e, std::list<T2>& bs){
+	for(typename std::list<T2>::iterator b=bs.begin();b!=bs.end();++b){
+		if(checkHit(e->x, e->y, e->width, e->height, (*b)->x, (*b)->y, (*b)->width, (*b)->height)){
+			(*b)->state=DISAPPEAR;
 			return true;
 		}
 	}
 	return false;
 }
 
-bool checkHitMyShip_Enemy(MyShip* myship, Enemy** enemy){
-	for(int i=0;i<MAX_ENEMY;++i){
-		if(*(enemy+i)==NULL) continue;
-		if(checkHit(myship->x, myship->y, myship->width, myship->height, (*(enemy+i))->x, (*(enemy+i))->y, (*(enemy+i))->width, (*(enemy+i))->height)){
-			myship->state=DAMAGE;
-			return true;
-		}
-	}
-}
-
-void drawField(const MyShip* myship, MyShipBeam** myBeam, Enemy** enemy, EnemyBeam** eneBeam){
+void drawField(const MyShip* myship, const std::list<MyShipBeam*>& myshipBeam, const std::list<Enemy*>& enemy, const std::list<EnemyBeam*>& enemyBeam){
 	write2Byte(myship->x, myship->y, myship->character, myship->attribute);
-	for(int i=0;i<MAX_BEAM;++i){
-		if(*(myBeam+i)!=NULL&&(*(myBeam+i))->state==NORMAL){
-			write2Byte((*(myBeam+i))->x, (*(myBeam+i))->y, (*(myBeam+i))->character, (*(myBeam+i))->attribute);
-		}
+	for(std::list<MyShipBeam*>::const_iterator i=myshipBeam.begin();i!=myshipBeam.end();++i){
+		write2Byte((*i)->x, (*i)->y, (*i)->character, (*i)->attribute);
 	}
-	for(int i=0;i<MAX_ENEMY;++i){
-		if(*(enemy+i)!=NULL&&(*(enemy+i))->state==NORMAL){
-			write2Byte((*(enemy+i))->x, (*(enemy+i))->y, (*(enemy+i))->character, (*(enemy+i))->attribute);
-		}
+	for(std::list<Enemy*>::const_iterator i=enemy.begin();i!=enemy.end();++i){
+		write2Byte((*i)->x, (*i)->y, (*i)->character, (*i)->attribute);
 	}
-	for(int i=0;i<MAX_ENEBEAM;++i){
-		if(*(eneBeam+i)!=NULL&&(*(eneBeam+i))->state==NORMAL){
-			write2Byte((*(eneBeam+i))->x, (*(eneBeam+i))->y, (*(eneBeam+i))->character, (*(eneBeam+i))->attribute);
-		}
+	for(std::list<EnemyBeam*>::const_iterator i=enemyBeam.begin();i!=enemyBeam.end();++i){
+		write2Byte((*i)->x, (*i)->y, (*i)->character, (*i)->attribute);
 	}
 }
 
@@ -203,7 +173,7 @@ void drawGameOver(){
 	writeText(10, 21, "Please Press DELETE KEY to Quit.", CHAR_YELLOW);
 }
 
-bool isGameOver(MyShip* myship, Enemy** enemy){
+bool isGameOver(MyShip* myship, std::list<Enemy*> enemy){
 	return myship->HP<=0;
 }
 
@@ -215,9 +185,10 @@ int main(){
 	initializeWindow(100, 200, SCREEN_WIDTH, SCREEN_HEIGHT, (char *)TITLE, true);
 
 	MyShip* myship=NULL;
-	MyShipBeam* myshipBeam[MAX_BEAM]={NULL};
-	Enemy* enemy[MAX_ENEMY]={NULL};
-	EnemyBeam* enemyBeam[MAX_ENEBEAM]={NULL};
+	std::list<MyShipBeam*> myshipBeam;
+	std::list<Enemy*> enemy;
+	std::list<EnemyBeam*> enemyBeam;
+	
 	int score=0;
 	int touch=0;
 	const int interval=10;
@@ -247,7 +218,8 @@ int main(){
 
 			//自機関連処理
 			myship->move();
-			if(checkHitMyShip_EnemyBeam(myship, enemyBeam)|(checkHitMyShip_Enemy(myship, enemy))){
+			if(checkHit_Chars<MyShip*, EnemyBeam*>(myship, enemyBeam)|(checkHit_Chars<MyShip*, Enemy*>(myship, enemy))){
+				myship->state=DAMAGE;
 				--myship->HP;
 			}
 
@@ -259,47 +231,49 @@ int main(){
 			}
 
 			//自機弾関連処理
-			for(int i=0;i<MAX_BEAM;++i){
-				if(*(myshipBeam+i)!=NULL){
-					if((*(myshipBeam+i))->state==NORMAL){
-						(*(myshipBeam+i))->move();
-					}
-					else{
-						delete *(myshipBeam+i);
-						*(myshipBeam+i)=NULL;
-					}
+			for(std::list<MyShipBeam*>::iterator i=myshipBeam.begin();i!=myshipBeam.end();){
+				if((*i)->state==NORMAL){
+					(*i)->move();
+					++i;
+				}
+				else{
+					delete *i;
+					i=myshipBeam.erase(i);
 				}
 			}
-
+			
 			//敵関連処理
 			if(remainEnemy<=0){
 				remainEnemy=makeEnemy(enemy);
 			}
-			for(int i=0;i<MAX_ENEMY;++i){
-				if(*(enemy+i)!=NULL){
-					if((*(enemy+i))->state==NORMAL){
-						(*(enemy+i))->move();
-						if(rand()%(40*remainEnemy)<1)makeEnemyBeam(*(enemy+i), enemyBeam);
-						score+=checkHitEnemy(myshipBeam, *(enemy+i));
+			
+			for(std::list<Enemy*>::iterator i=enemy.begin();i!=enemy.end();){
+				if((*i)->state==NORMAL){
+					(*i)->move();
+					if((*i)->fireable&&rand()%(40*remainEnemy)<1)makeEnemyBeam(*i, enemyBeam);
+					
+					if(checkHit_Chars<Enemy*, MyShipBeam*>(*i, myshipBeam)){
+						(*i)->state=DISAPPEAR;
+						++score;
 					}
-					else{
-						delete *(enemy+i);
-						*(enemy+i)=NULL;
-						--remainEnemy;
-					}
+					++i;
+				}
+				else{
+					delete *i;
+					i=enemy.erase(i);
+					--remainEnemy;
 				}
 			}
 
 			//敵弾関連処理
-			for(int i=0;i<MAX_ENEBEAM;++i){
-				if(*(enemyBeam+i)!=NULL){
-					if((*(enemyBeam+i))->state==NORMAL){
-						(*(enemyBeam+i))->move();
-					}
-					else{
-						delete *(enemyBeam+i);
-						*(enemyBeam+i)=NULL;
-					}
+			for(std::list<EnemyBeam*>::iterator i=enemyBeam.begin();i!=enemyBeam.end();){
+				if((*i)->state==NORMAL){
+					(*i)->move();
+					++i;
+				}
+				else{
+					delete *i;
+					i=enemyBeam.erase(i);
 				}
 			}
 
