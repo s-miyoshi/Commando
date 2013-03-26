@@ -9,7 +9,9 @@ void Enemy1::move(){
 	if(++count>=interval){
 		s=(s+(ccw?3:1))%4;
 		count=0;
+		++turn;
 	}
+
 	x+=v[t][0]*d[s][0];
 	y+=v[t][1]*d[s][1];
 	if(HP<=0)state=DISAPPEAR;
@@ -23,7 +25,7 @@ Enemy1::Enemy1(int x, int y, int width, int height, int hp,int r, int s, bool cc
 	this->ccw=ccw;
 	count=-1;
 	interval=r;
-	tick=0;
 	delay=10;
-	fireable=true;
+	shootable=true;
+	limit=rand()%10+20;
 }

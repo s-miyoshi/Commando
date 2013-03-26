@@ -8,6 +8,8 @@ Enemy::Enemy(int x, int y, int width, int height, int hp){
 	this->height=height;
 	this->HP=hp;
 	state=NORMAL;
+	tick=0;
+	turn=0;
 }
 
 bool Enemy::outOfField(){

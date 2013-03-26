@@ -51,7 +51,7 @@ void makeMyShipBeam(const MyShip* myship, std::list<MyShipBeam*>& myshipBeam){
 
 
 int makeEnemy(std::list<Enemy*>& enemy){
-	int pattern=0;
+	int pattern=(rand()%2)*2;
 	switch(pattern){
 	
 	//ç∂âEàÍîtâùïú ë¸
@@ -108,6 +108,42 @@ int makeEnemy(std::list<Enemy*>& enemy){
 			return total;
 			break;
 		}
+	//èWçá->ó£éU "ô["
+	case 2:
+		{
+			int m=rand()%3+1;
+			int total=0;
+			const int MAX_Y=18, MIN_Y=5;
+			bool* used=new bool[MAX_Y];
+			for(int i=0;i<m;++i){
+				int n=0;
+				switch(m){
+				case 3:
+					n=rand()%4+4;
+					break;
+				case 2:
+					n=rand()%5+6;
+					break;
+				case 1:
+					n=rand()%7+10;
+					break;
+				}
+
+				int x=rand()%(FIELD_WIDTH-n*CHARACTER_WIDTH);
+				int y=rand()%(MAX_Y-MIN_Y)+MIN_Y;
+				for(;used[y];y=rand()%(MAX_Y-MIN_Y)+MIN_Y);
+				used[y]=true;
+				int r=20+rand()%10;
+				int wait=200+(rand()%5)*40;
+				for(int j=0;j<n;++j){
+					enemy.push_back(new Enemy3(x+j*CHARACTER_WIDTH, y, CHARACTER_WIDTH, CHARACTER_HEIGHT, 1, r, rand()%3+2, rand()%2, wait));
+				}
+				total+=n;
+			}
+		delete used;
+		return total;
+		break;
+		}
 	}
 }
 
@@ -129,17 +165,18 @@ template<typename T1, typename T2> bool checkHit_Chars(T1 e, std::list<T2>& bs){
 	return false;
 }
 
+template<typename T> void drawCharacters(std::list<T> character){
+	for(typename std::list<T>::iterator i=character.begin();i!=character.end();++i){
+		if((*i)->x<0||(*i)->x>=FIELD_WIDTH||(*i)->y<0||(*i)->y>=FIELD_HEIGHT) continue;
+		write2Byte((*i)->x, (*i)->y, (*i)->character, (*i)->attribute);
+	}
+}
+
 void drawField(const MyShip* myship, const std::list<MyShipBeam*>& myshipBeam, const std::list<Enemy*>& enemy, const std::list<EnemyBeam*>& enemyBeam){
 	write2Byte(myship->x, myship->y, myship->character, myship->attribute);
-	for(std::list<MyShipBeam*>::const_iterator i=myshipBeam.begin();i!=myshipBeam.end();++i){
-		write2Byte((*i)->x, (*i)->y, (*i)->character, (*i)->attribute);
-	}
-	for(std::list<Enemy*>::const_iterator i=enemy.begin();i!=enemy.end();++i){
-		write2Byte((*i)->x, (*i)->y, (*i)->character, (*i)->attribute);
-	}
-	for(std::list<EnemyBeam*>::const_iterator i=enemyBeam.begin();i!=enemyBeam.end();++i){
-		write2Byte((*i)->x, (*i)->y, (*i)->character, (*i)->attribute);
-	}
+	drawCharacters<MyShipBeam*>(myshipBeam);
+	drawCharacters<Enemy*>(enemy);
+	drawCharacters<EnemyBeam*>(enemyBeam);
 }
 
 void drawMenu(const MyShip* myship, int score, bool playing){
@@ -148,9 +185,8 @@ void drawMenu(const MyShip* myship, int score, bool playing){
 	sprintf(str, "Score:   %08d", score);
 	writeText(53, 4, str, CHAR_WHITE|BACK_BLUE);
 	
-	if(myship!=NULL) for(int i=0;i<myship->HP;++i) write2Byte(53+4*i, 14, myship->character, CHAR_WHITE|BACK_BLUE);
-	
 	if(playing){
+		if(myship!=NULL) for(int i=0;i<myship->HP;++i) write2Byte(53+4*i, 14, myship->character, CHAR_WHITE|BACK_BLUE);
 		writeText(53, 17, "Press", CHAR_YELLOW|BACK_BLUE);
 		writeText(53, 18, "ESC KEY", CHAR_YELLOW|BACK_BLUE);
 		writeText(53, 19, "to Quit.", CHAR_YELLOW|BACK_BLUE);
@@ -218,7 +254,7 @@ int main(){
 
 			//é©ã@ä÷òAèàóù
 			myship->move();
-			if(checkHit_Chars<MyShip*, EnemyBeam*>(myship, enemyBeam)|(checkHit_Chars<MyShip*, Enemy*>(myship, enemy))){
+			if(myship->state==NORMAL && (checkHit_Chars<MyShip*, EnemyBeam*>(myship, enemyBeam)|(checkHit_Chars<MyShip*, Enemy*>(myship, enemy)))){
 				myship->state=DAMAGE;
 				--myship->HP;
 			}
@@ -250,7 +286,7 @@ int main(){
 			for(std::list<Enemy*>::iterator i=enemy.begin();i!=enemy.end();){
 				if((*i)->state==NORMAL){
 					(*i)->move();
-					if((*i)->fireable&&rand()%(40*remainEnemy)<1)makeEnemyBeam(*i, enemyBeam);
+					if((*i)->shootable&&rand()%(40*remainEnemy)<1)makeEnemyBeam(*i, enemyBeam);
 					
 					if(checkHit_Chars<Enemy*, MyShipBeam*>(*i, myshipBeam)){
 						(*i)->state=DISAPPEAR;
